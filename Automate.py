@@ -96,14 +96,14 @@ def error_execution(tool_name): print_red ("Error Executing " + tool_name)
 # FTP Enum
 
 nmap_ftp_tool_name = 'NMAP FTP Enum'
-hydra_brute_ftp = 'Hydra FTP Brute Force'
 
-
+# Description: Execute an Nmap FTP enum command
+# Return: The output after command execution
 def execute_nmap_ftp_enum(ip_address, port_number):
     command = "nmap -sV -p %s --script=ftp* %s" % (port_number, ip_address)
     return execute_cmd (nmap_ftp_tool_name, command)
 
-
+# Execute FTP Enum
 def enum_ftp(ip_address, port_number):
     output = ''
     try:
@@ -119,20 +119,22 @@ def enum_ftp(ip_address, port_number):
 # HTTP Enum
 
 nmap_tool_name = 'NMAP HTTP Enum'
-crawler_tool_name = 'Dir HTTP Enum'
+crawler_tool_name = 'Gobuster'
 
-
+# Description: Execute an Nmap HTTP enum command
+# Return: The output after command execution
 def execute_nmap_http_enum(ip_address, port_number):
     command = "nmap -sV -p %s --script=http-enum,http-vuln*  %s" % (port_number, ip_address)
     return execute_cmd (nmap_tool_name, command)
 
-
+# Description: Execute an HTTP browsing enum command
+# Return: The output after command execution
 def execute_directories_http_enum(ip_address, port_number):
     command = "gobuster -u http://%s:%s -w /usr/share/wordlists/dirb/common.txt -s '200,204,301,302,307,403,500' -e" % (
         ip_address, port_number)
     return execute_cmd (crawler_tool_name, command)
 
-
+# Execute HTTP Enum
 def enum_http(ip_address, port_number):
     output = ''
     try:
@@ -153,33 +155,39 @@ def enum_http(ip_address, port_number):
 ##################################################################################################
 # Automate Core
 
+# Description: Parse the nmap results
+# Return: A list of service object
 def parse_nmap_output(nmap_output):
     service_names_list = {}
     nmap_output = nmap_output.split ("\n")
     for output_line in nmap_output:
         output_line = output_line.strip ()
         services_list = []
+        # if port is opened
         if ("tcp" in output_line) and ("open" in output_line) and not ("Discovered" in output_line):
+            # cleanup the spaces
             while "  " in output_line:
                 output_line = output_line.replace ("  ", " ")
-
+            # Split the line
             output_line_split = output_line.split (" ")
-
+            # The third part of the split is the service name
             service_name = output_line_split[2]
+            # The first part of the split is the port number
             port_number = output_line_split[0]
 
+            # It's time to get the service description
             output_line_split_length = len (output_line_split)
             end_position = output_line_split_length - 1
             current_position = 3
-
             service_description = ''
 
             while current_position <= end_position:
                 service_description += ' ' + output_line_split[current_position]
                 current_position += 1
 
+            # Create the service Object
             service = ServiceDTO (port_number, service_name, service_description)
-
+            # Make sure to add a new service if another one already exists on a different port number
             if service_name in service_names_list:
                 # Get the objects that are previously saved
                 services_list = service_names_list[service_name]
@@ -189,6 +197,7 @@ def parse_nmap_output(nmap_output):
 
     return service_names_list
 
+# Start the enumeration process after the TCP scan
 def start_enumeration_process(nmap_output_services_list, ip_address):
     enum_output = ''
     for service_name in nmap_output_services_list:
@@ -204,11 +213,13 @@ def start_enumeration_process(nmap_output_services_list, ip_address):
 
     save_results(enum_output,'./reports', ip_address+".txt")
 
-
+# Start Nmap TCP Scan
 def start_nmap_tcp_scan(ip_address):
     nmap_tcp_command = "nmap -T4 -sS -sV -sC -p- -O --open --osscan-guess --version-all %s" % ip_address
     nmap_tcp_output = execute_cmd ('Nmap TCP Scan', nmap_tcp_command)
+    #Parse the nmap scan results
     service_names_list = parse_nmap_output(nmap_tcp_output)
+    #Start the enumeration process
     start_enumeration_process(service_names_list,ip_address)
     print_yellow("[!] The Program Scanner Has Finished The Execution (report saved to /reports)")
 
